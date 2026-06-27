@@ -1,6 +1,6 @@
 ---
 name: client-secret-exposure
-description: Use when doing a full security audit of any project — web (Next.js, React, Vue), mobile (Flutter, React Native, iOS, Android), or backend (Node, Express, Firebase). Triggers on leaked API keys, hardcoded credentials, NEXT_PUBLIC_ variables, missing auth on API routes, XSS risks, insecure token storage, vulnerable dependencies, missing security headers, broken access control, IDOR, rate limiting, bot protection, JWT misconfigurations, business logic bugs, race conditions, sequential IDs, CI/CD secrets, certificate pinning, deep link injection, SRI, password hashing, or exposed .git directories.
+description: Use when doing a full security audit of any project — web (Next.js, React, Vue), mobile (Flutter, React Native, iOS, Android), or backend (Node, Express, Firebase, PostgreSQL, MySQL, MongoDB). Triggers on leaked API keys, SQL injection, hardcoded credentials, NEXT_PUBLIC_ variables, missing auth on API routes, XSS, insecure token storage, vulnerable dependencies, missing security headers, broken access control, IDOR, rate limiting, bot protection, JWT misconfigurations, business logic bugs, race conditions, sequential IDs, CI/CD secrets, certificate pinning, deep link injection, SRI, password hashing, database row-level security, SELECT * exposure, or exposed .git directories.
 ---
 
 # Full-Stack Security Audit
@@ -716,6 +716,236 @@ export async function GET() {
 
 ---
 
+## 18. SQL & Database Security
+
+SQL injection, over-privileged database users, missing row-level security, and exposed sensitive columns are among the most damaging vulnerabilities in any backend. This section covers SQL (PostgreSQL, MySQL, SQLite) and NoSQL (MongoDB) databases.
+
+### SQL Injection
+
+String interpolation in queries lets attackers run arbitrary SQL. A single vulnerable query can dump your entire database.
+
+**Detection:**
+```bash
+# Find string interpolation inside SQL queries — highest risk
+grep -rn "query\`\|execute\`\|raw\`\|sql\`" src/ --include="*.ts" --include="*.js" | grep '\${'
+
+# Find raw query methods in ORMs
+grep -rn "\$queryRaw\|\$executeRaw\|knex\.raw\|sequelize\.query\|db\.prepare" src/ --include="*.ts"
+
+# Find template literals building SQL
+grep -rn "SELECT\|INSERT\|UPDATE\|DELETE\|WHERE" src/ --include="*.ts" | grep '\${'
+```
+
+```ts
+// BROKEN — user input directly in query string
+const results = await db.query(`SELECT * FROM tickets WHERE event_id = '${eventId}'`);
+// Attacker sends: eventId = "' OR '1'='1"  → dumps all tickets
+
+// FIXED — parameterized query (works for any SQL driver)
+const results = await db.query('SELECT * FROM tickets WHERE event_id = $1', [eventId]);
+
+// FIXED — Prisma ORM (parameterized automatically)
+const results = await prisma.ticket.findMany({ where: { eventId } });
+
+// FIXED — Prisma raw query, use Prisma.sql tag (not string interpolation)
+const results = await prisma.$queryRaw`SELECT * FROM tickets WHERE event_id = ${eventId}`;
+// NOT: prisma.$queryRaw(`SELECT * FROM tickets WHERE event_id = '${eventId}'`)
+```
+
+**ORM raw query danger — all of these are vulnerable:**
+```ts
+// Prisma — unsafe
+prisma.$queryRawUnsafe(`SELECT * FROM users WHERE id = ${userId}`)
+
+// Drizzle — unsafe
+db.execute(sql.raw(`SELECT * FROM users WHERE id = ${userId}`))
+
+// TypeORM — unsafe
+repo.query(`SELECT * FROM users WHERE id = ${userId}`)
+
+// All safe alternatives use parameterization:
+prisma.$queryRaw`SELECT * FROM users WHERE id = ${userId}`
+db.execute(sql`SELECT * FROM users WHERE id = ${userId}`)
+repo.query('SELECT * FROM users WHERE id = $1', [userId])
+```
+
+### Least-Privilege Database Users
+
+The application should never connect to the database as `root`, `postgres`, or any superuser. If an attacker gets SQL injection, they should hit a wall immediately.
+
+**Create a restricted app user (PostgreSQL):**
+```sql
+-- Create user with a strong password
+CREATE USER app_user WITH PASSWORD 'strong-random-password';
+
+-- Grant only what the app needs
+GRANT CONNECT ON DATABASE mydb TO app_user;
+GRANT USAGE ON SCHEMA public TO app_user;
+GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO app_user;
+GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO app_user;
+
+-- Never grant these to the app user:
+-- GRANT ALL PRIVILEGES ...
+-- GRANT SUPERUSER ...
+-- GRANT CREATEDB ...
+```
+
+**Create a read-only user for analytics/reporting:**
+```sql
+CREATE USER readonly_user WITH PASSWORD 'another-strong-password';
+GRANT CONNECT ON DATABASE mydb TO readonly_user;
+GRANT USAGE ON SCHEMA public TO readonly_user;
+GRANT SELECT ON ALL TABLES IN SCHEMA public TO readonly_user;
+-- No INSERT, UPDATE, DELETE
+```
+
+**Detection — check your connection string:**
+```bash
+# If your DATABASE_URL contains 'postgres:' or 'root:' as the user, it's a superuser
+echo $DATABASE_URL | grep -E "postgres:|root:|admin:"
+```
+
+### Row-Level Security (PostgreSQL RLS)
+
+RLS is the SQL equivalent of Firebase Security Rules — it enforces data ownership at the database level, so even a buggy query can't leak another user's data.
+
+```sql
+-- Step 1: Enable RLS on the table
+ALTER TABLE tickets ENABLE ROW LEVEL SECURITY;
+ALTER TABLE tickets FORCE ROW LEVEL SECURITY;  -- applies to table owner too
+
+-- Step 2: Create policies
+
+-- Users can only see their own tickets
+CREATE POLICY tickets_select_own ON tickets
+  FOR SELECT
+  USING (user_id = current_setting('app.current_user_id', true)::uuid);
+
+-- Users can only update their own tickets
+CREATE POLICY tickets_update_own ON tickets
+  FOR UPDATE
+  USING (user_id = current_setting('app.current_user_id', true)::uuid);
+
+-- Admins can see everything
+CREATE POLICY tickets_admin ON tickets
+  FOR ALL
+  USING (current_setting('app.user_role', true) = 'admin');
+```
+
+**Set the user context per request in your app:**
+```ts
+// Set the current user ID before any query in the request
+await prisma.$executeRaw`SET LOCAL app.current_user_id = ${userId}`;
+await prisma.$executeRaw`SET LOCAL app.user_role = ${userRole}`;
+// All subsequent queries in this transaction are scoped to this user
+```
+
+**RLS checklist:**
+- [ ] RLS enabled on all tables that contain per-user data
+- [ ] `FORCE ROW LEVEL SECURITY` set — applies even to the table owner
+- [ ] Default-deny: no policy = no access (PostgreSQL default when RLS is enabled)
+- [ ] Admin bypass policy is explicit and role-gated
+
+### Data Exposure — SELECT * and Sensitive Columns
+
+Returning more data than needed is a common source of accidental PII exposure.
+
+**Detection:**
+```bash
+# Find SELECT * in raw queries
+grep -rn "SELECT \*\|findMany()\|findAll()" src/ --include="*.ts"
+
+# Find API routes that return full DB objects (may include sensitive fields)
+grep -rn "return.*ticket\b\|res\.json(user\b" src/app/api/ --include="*.ts"
+```
+
+```ts
+// BROKEN — returns password_hash, internal fields, PII to the client
+const user = await prisma.user.findUnique({ where: { id } });
+return NextResponse.json(user);
+
+// FIXED — explicitly select only what the client needs
+const user = await prisma.user.findUnique({
+  where: { id },
+  select: { id: true, name: true, email: true }, // password_hash excluded
+});
+return NextResponse.json(user);
+```
+
+**Columns that must never be returned to clients:**
+- `password`, `password_hash`, `hashed_password`
+- `secret_key`, `api_key`, `private_key`
+- `ssn`, `tax_id`, `national_id`
+- `credit_card_number`, `cvv`
+- `reset_token`, `verification_token`, `mfa_secret`
+- Internal audit fields: `created_by_admin`, `is_flagged`, `internal_notes`
+
+**Missing LIMIT — full table dump:**
+```ts
+// BROKEN — attacker requests page=0&limit=999999
+const { limit } = await req.json();
+const tickets = await db.query(`SELECT * FROM tickets LIMIT ${limit}`);
+
+// FIXED — cap the limit server-side
+const MAX_PAGE_SIZE = 100;
+const safeLimit = Math.min(Number(limit) || 20, MAX_PAGE_SIZE);
+const tickets = await prisma.ticket.findMany({ take: safeLimit });
+```
+
+### Connection Security
+
+```bash
+# Check if your database port is exposed to the internet (should not be)
+nmap -p 5432 your-server-ip    # PostgreSQL default port
+nmap -p 3306 your-server-ip    # MySQL default port
+nmap -p 27017 your-server-ip   # MongoDB default port
+# Any of these returning "open" is a critical misconfiguration
+```
+
+**SSL for database connections (PostgreSQL):**
+```ts
+// Prisma — require SSL in production
+// DATABASE_URL="postgresql://user:pass@host:5432/db?sslmode=require"
+
+// pg driver
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: true } : false,
+});
+```
+
+**Rules:**
+- Database must not be reachable from the public internet — only from your app servers / VPC
+- All connections must use SSL in production (`sslmode=require`)
+- Rotate database passwords the same way you rotate API keys — treat them as secrets
+- Use a connection pooler (PgBouncer, Prisma Accelerate) — never open a new connection per request
+
+### NoSQL Injection (MongoDB)
+
+MongoDB is vulnerable to operator injection when query objects are built from user input.
+
+**Detection:**
+```bash
+grep -rn "find(\|findOne(\|aggregate(" src/ --include="*.ts" | grep "req\.\|body\.\|params\."
+```
+
+```ts
+// BROKEN — attacker sends { "username": { "$gt": "" } } to bypass auth
+const user = await User.findOne({ username: req.body.username });
+
+// BROKEN — $where executes arbitrary JS
+User.find({ $where: `this.username == '${username}'` });
+
+// FIXED — cast to expected types, never pass objects from client directly
+const user = await User.findOne({ username: String(req.body.username) });
+
+// FIXED — validate input shape with zod before using in query
+const { username } = z.object({ username: z.string().max(100) }).parse(req.body);
+const user = await User.findOne({ username });
+```
+
+---
+
 ## CORS vs Real Server Enforcement
 
 `Access-Control-Allow-Origin: yourapp.com` does **not** protect your API. curl, Postman, and any script bypass it completely.
@@ -825,6 +1055,20 @@ export async function GET() {
 - [ ] `/.env` returns 403/404
 - [ ] Health endpoints expose no version or config info
 - [ ] No `/debug` or `/admin` endpoints publicly accessible
+
+### 18. SQL & Database Security
+- [ ] No string interpolation in SQL queries — parameterized queries or ORM only
+- [ ] No `$queryRawUnsafe` / `knex.raw` / `repo.query` with template literals
+- [ ] App connects as a least-privilege user — not `postgres` / `root` / superuser
+- [ ] Read-only DB user used for analytics/reporting queries
+- [ ] Row-Level Security (RLS) enabled on all per-user tables in PostgreSQL
+- [ ] `FORCE ROW LEVEL SECURITY` set on RLS tables
+- [ ] API routes use `select` to return only needed fields — no `SELECT *` to client
+- [ ] Sensitive columns never returned: `password_hash`, `reset_token`, `mfa_secret`
+- [ ] All list endpoints have a server-enforced `LIMIT` / `take` cap
+- [ ] Database port not reachable from the public internet
+- [ ] Database connections use SSL in production (`sslmode=require`)
+- [ ] For MongoDB: user input cast to expected types before use in queries — never pass raw body objects
 
 ### Post-fix (after finding any issue)
 1. Rotate the exposed credential immediately — assume compromised
