@@ -1,51 +1,50 @@
-# nextjs-secret-exposure — Claude Skill
+# client-secret-exposure — Claude Skill
 
-A Claude Code skill that audits Next.js apps for secrets exposed in the client-side JavaScript bundle.
+A Claude Code skill for auditing **any** project — web, Flutter, React Native, iOS, Android, backend — for secrets exposed in client-side code.
 
 ## Install
 
 ```bash
 /plugin marketplace add ahmadalhaish-tickit/tickit-claude-marketplace
-/plugin install nextjs-secret-exposure@tickit-claude-marketplace
+/plugin install client-secret-exposure@tickit-claude-marketplace
 ```
 
-That's it. Claude Code loads the skill automatically from that point on.
+## What it covers
 
-## What it does
+| Platform | What it detects |
+|---|---|
+| Web (Next.js, React, Vue) | `NEXT_PUBLIC_` vars baked into JS bundle, keys in image URLs |
+| Flutter / Dart | Hardcoded strings in `lib/`, `dart-define` values in APK binary |
+| React Native | Secrets in embedded JS bundle inside APK/IPA |
+| iOS / Android native | Strings in compiled binary |
+| Any platform | Secrets in git history |
 
-When you ask Claude to audit your Next.js project for leaked secrets, this skill teaches it:
-
-- How to detect `NEXT_PUBLIC_` variables baked into the JS bundle
-- Which credentials are **dangerous** (payment credentials, API secrets) vs **public by design** (Stripe publishable key, GTM ID, reCAPTCHA site key)
-- How to implement a **server-side proxy route** for secrets that must never reach the browser
-- The difference between **CORS** (browser-enforced, bypassable) and **Firebase App Check** (server-enforced, cannot be faked)
-- A post-fix verification checklist for Vercel deployments
-
-## What the skill covers
+## Skill topics
 
 | Topic | Detail |
 |---|---|
-| Detection | `grep` commands for bundle and raw HTML |
-| Classification | Table of 12+ key types — dangerous vs safe |
-| Fix Pattern 1 | Server-side proxy for payment/API credentials |
-| Fix Pattern 2 | Image URL proxy for Google Maps static API |
-| Fix Pattern 3 | Firebase App Check + Firestore Security Rules |
-| CORS vs App Check | Why CORS does not protect Firebase APIs |
+| Detection | grep commands per platform — bundle, binary, git history |
+| Classification | 15+ key types — safe vs dangerous vs partial |
+| BFF proxy pattern | Client calls your backend, your backend calls the API |
+| Image URL proxy | For keys embedded in `<img src>` or static asset URLs |
+| Environment variables | Correct approach per platform (Next.js, Flutter, RN, backend) |
+| Firebase | App Check + Security Rules — the right way to secure Firebase |
+| CORS vs server auth | Why `Access-Control-Allow-Origin` does not protect APIs |
 | Base64 warning | Not encryption — decoded in 2 seconds |
-| Verification | Post-fix checklist for Vercel deployment |
+| Post-fix checklist | Rotate, remove, deploy, verify, clean history, restrict |
 
 ## Usage
 
-After installing, just ask Claude:
+After installing, ask Claude:
 
 ```
-audit this Next.js project for exposed secrets
+audit this project for exposed secrets
 ```
-
-or
-
 ```
-check if any NEXT_PUBLIC_ variables contain secrets
+check our Flutter app for hardcoded API keys
+```
+```
+is this key safe to put in the client bundle?
 ```
 
 ## License

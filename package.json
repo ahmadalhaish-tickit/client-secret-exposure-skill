@@ -1,13 +1,15 @@
 {
-  "name": "nextjs-secret-exposure",
+  "name": "client-secret-exposure",
   "version": "1.0.0",
-  "description": "Claude skill for auditing Next.js apps for secrets exposed in the client JS bundle",
+  "description": "Claude skill for auditing any project — web, Flutter, React Native, backend — for secrets exposed in client-side code",
   "type": "module",
   "keywords": [
     "pi-package",
     "skills",
     "security",
+    "flutter",
     "nextjs",
+    "mobile",
     "audit"
   ],
   "pi": {

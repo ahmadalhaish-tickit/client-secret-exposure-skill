@@ -1,17 +1,20 @@
 {
-  "name": "nextjs-secret-exposure",
-  "description": "Audits Next.js apps for secrets exposed in the client JS bundle via NEXT_PUBLIC_ env vars",
+  "name": "client-secret-exposure",
+  "description": "Audits any project for secrets exposed in client-side code — web bundles, Flutter/React Native APKs, iOS/Android binaries, or git history",
   "version": "1.0.0",
   "author": {
     "name": "TICKIT",
     "email": "ahmad.alhaish@tickit.co"
   },
-  "homepage": "https://github.com/ahmadalhaish-tickit/nextjs-secret-exposure-skill",
-  "repository": "https://github.com/ahmadalhaish-tickit/nextjs-secret-exposure-skill",
+  "homepage": "https://github.com/ahmadalhaish-tickit/client-secret-exposure-skill",
+  "repository": "https://github.com/ahmadalhaish-tickit/client-secret-exposure-skill",
   "license": "MIT",
   "keywords": [
     "security",
+    "flutter",
     "nextjs",
+    "mobile",
+    "react-native",
     "secrets",
     "skills",
     "audit"
