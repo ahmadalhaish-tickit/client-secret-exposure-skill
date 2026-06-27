@@ -1,6 +1,6 @@
-# client-secret-exposure — Claude Skill
+# client-secret-exposure — Claude Security Audit Skill
 
-A Claude Code skill for auditing **any** project — web, Flutter, React Native, iOS, Android, backend — for secrets exposed in client-side code.
+A Claude Code skill for a **full security audit** of any project — web (Next.js, React, Vue), mobile (Flutter, React Native, iOS, Android), or backend (Node, Express, Firebase).
 
 ## Install
 
@@ -9,43 +9,53 @@ A Claude Code skill for auditing **any** project — web, Flutter, React Native,
 /plugin install client-secret-exposure@tickit-claude-marketplace
 ```
 
-## What it covers
+## What it covers (8 security areas)
 
-| Platform | What it detects |
-|---|---|
-| Web (Next.js, React, Vue) | `NEXT_PUBLIC_` vars baked into JS bundle, keys in image URLs |
-| Flutter / Dart | Hardcoded strings in `lib/`, `dart-define` values in APK binary |
-| React Native | Secrets in embedded JS bundle inside APK/IPA |
-| iOS / Android native | Strings in compiled binary |
-| Any platform | Secrets in git history |
-
-## Skill topics
-
-| Topic | Detail |
-|---|---|
-| Detection | grep commands per platform — bundle, binary, git history |
-| Classification | 15+ key types — safe vs dangerous vs partial |
-| BFF proxy pattern | Client calls your backend, your backend calls the API |
-| Image URL proxy | For keys embedded in `<img src>` or static asset URLs |
-| Environment variables | Correct approach per platform (Next.js, Flutter, RN, backend) |
-| Firebase | App Check + Security Rules — the right way to secure Firebase |
-| CORS vs server auth | Why `Access-Control-Allow-Origin` does not protect APIs |
-| Base64 warning | Not encryption — decoded in 2 seconds |
-| Post-fix checklist | Rotate, remove, deploy, verify, clean history, restrict |
+| Area | What it checks |
+| --- | --- |
+| **1. Secret exposure** | `NEXT_PUBLIC_` vars in JS bundle, hardcoded strings in APK/IPA binary, secrets in git history |
+| **2. Dependency vulnerabilities** | `npm audit`, `flutter pub outdated`, CVE severity triage |
+| **3. Security headers** | CSP, HSTS, X-Frame-Options, X-Content-Type-Options, Referrer-Policy |
+| **4. Insecure storage** | Tokens in `localStorage` (use httpOnly cookies), tokens in SharedPreferences (use Keychain/Keystore) |
+| **5. Broken access control** | IDOR — API routes that accept IDs without ownership checks |
+| **6. Input validation & XSS** | `dangerouslySetInnerHTML`, open redirects, file upload, API body validation |
+| **7. Sensitive data in logs** | PII in `console.log`, raw error objects returned to clients |
+| **8. Firebase Storage rules** | Public buckets, missing auth requirement, missing size/type limits |
 
 ## Usage
 
 After installing, ask Claude:
 
+```text
+do a full security audit of this project
 ```
-audit this project for exposed secrets
-```
-```
+
+```text
 check our Flutter app for hardcoded API keys
 ```
+
+```text
+audit our API routes for broken access control
 ```
+
+```text
 is this key safe to put in the client bundle?
 ```
+
+```text
+what security headers are we missing?
+```
+
+## Full audit checklist
+
+The skill includes a complete checklist covering all 8 areas — run it against any codebase to get a structured security report.
+
+## Platforms covered
+
+- Web: Next.js, React, Vue, Angular
+- Mobile: Flutter, React Native, iOS (Swift/ObjC), Android (Kotlin/Java)
+- Backend: Node.js, Express, Firebase Cloud Functions
+- Database: Firestore, Firebase Realtime DB, Firebase Storage
 
 ## License
 
