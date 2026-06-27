@@ -1,6 +1,6 @@
 {
   "name": "client-secret-exposure",
-  "description": "Full-stack security audit for any project — covers secret exposure, dependency CVEs, security headers, insecure storage, broken access control, XSS, input validation, sensitive data in logs, and Firebase Storage rules",
+  "description": "Full-stack security audit for web, mobile, and backend — 17 areas including secrets, dependencies, security headers, insecure storage, IDOR, XSS, rate limiting, bot protection, JWT security, business logic, sequential IDs, CI/CD secrets, certificate pinning, deep link injection, SRI, password hashing, and exposed infrastructure",
   "version": "1.0.0",
   "author": {
     "name": "TICKIT",
