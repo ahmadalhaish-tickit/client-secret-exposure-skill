@@ -1,0 +1,19 @@
+{
+  "name": "nextjs-secret-exposure",
+  "description": "Audits Next.js apps for secrets exposed in the client JS bundle via NEXT_PUBLIC_ env vars",
+  "version": "1.0.0",
+  "author": {
+    "name": "TICKIT",
+    "email": "ahmad.alhaish@tickit.co"
+  },
+  "homepage": "https://github.com/ahmadalhaish-tickit/nextjs-secret-exposure-skill",
+  "repository": "https://github.com/ahmadalhaish-tickit/nextjs-secret-exposure-skill",
+  "license": "MIT",
+  "keywords": [
+    "security",
+    "nextjs",
+    "secrets",
+    "skills",
+    "audit"
+  ]
+}

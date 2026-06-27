@@ -2,40 +2,24 @@
 
 A Claude Code skill that audits Next.js apps for secrets exposed in the client-side JavaScript bundle.
 
+## Install
+
+```bash
+/plugin marketplace add ahmadalhaish-tickit/tickit-claude-marketplace
+/plugin install nextjs-secret-exposure@tickit-claude-marketplace
+```
+
+That's it. Claude Code loads the skill automatically from that point on.
+
 ## What it does
 
 When you ask Claude to audit your Next.js project for leaked secrets, this skill teaches it:
 
 - How to detect `NEXT_PUBLIC_` variables baked into the JS bundle
-- Which credentials are **dangerous** (payment credentials, API secrets) vs **public by design** (Stripe publishable key, GTM ID)
+- Which credentials are **dangerous** (payment credentials, API secrets) vs **public by design** (Stripe publishable key, GTM ID, reCAPTCHA site key)
 - How to implement a **server-side proxy route** for secrets that must never reach the browser
 - The difference between **CORS** (browser-enforced, bypassable) and **Firebase App Check** (server-enforced, cannot be faked)
-- A post-fix verification checklist
-
-## Install
-
-```bash
-# macOS / Linux
-git clone https://github.com/ahmadalhaish-tickit/nextjs-secret-exposure-skill ~/.claude/skills/nextjs-secret-exposure
-```
-
-That's it. Claude Code loads skills from `~/.claude/skills/` automatically.
-
-## Usage
-
-After installing, just ask Claude:
-
-```
-audit this Next.js project for exposed secrets
-```
-
-or
-
-```
-check if any NEXT_PUBLIC_ variables contain secrets
-```
-
-Claude will use the skill automatically when it detects a security review task.
+- A post-fix verification checklist for Vercel deployments
 
 ## What the skill covers
 
@@ -50,13 +34,19 @@ Claude will use the skill automatically when it detects a security review task.
 | Base64 warning | Not encryption — decoded in 2 seconds |
 | Verification | Post-fix checklist for Vercel deployment |
 
-## Skill file location
+## Usage
 
-After install: `~/.claude/skills/nextjs-secret-exposure/SKILL.md`
+After installing, just ask Claude:
 
-## Requirements
+```
+audit this Next.js project for exposed secrets
+```
 
-- [Claude Code](https://claude.ai/code) CLI
+or
+
+```
+check if any NEXT_PUBLIC_ variables contain secrets
+```
 
 ## License
 
